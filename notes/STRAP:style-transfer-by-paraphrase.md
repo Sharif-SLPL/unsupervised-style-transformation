@@ -27,4 +27,4 @@ This method is much more well-suited for the formality transfer since it doesn't
 Need of a pre-trained model to be fine-tuned for the paraphrase generation, which by itself results in need for more data?
 
 ## 5. The problem that could be addressed in the future.
-...
+Nothing for now until tested on Persian data. 
