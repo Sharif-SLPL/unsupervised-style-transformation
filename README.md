@@ -1,5 +1,5 @@
 # Persian Formality Style Transfer
-This project aim to do formality style transfer on Persian language using the T5 transformer architecture.  
+This project aims to do formality style transfer on Persian language using the T5 transformer architecture.  
 
 ### Available Tasks
 | Tasks | Description |
