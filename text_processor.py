@@ -6,7 +6,7 @@ from text_processor import *
 from config import TRAIN_CONFIG
 
 pd.options.display.max_colwidth = 200
-tagger = POSTagger(model='postagger.model')
+tagger = POSTagger(model='models/postagger.model')
 
 # TODO: Implement tips on this: https://www.niu.edu/writingtutorial/style/formal-and-informal-style.shtml
 
