@@ -14,7 +14,7 @@ GENERATION_CONFIG = {
     "text_similarity": 0.8,
     "num_beams": 5,
     "do_sample": True,
-    "temperature": 0.9,
-    "top_p": 0.6,
-    "top_k": 50,
+    "temperature": 0.7,
+    "top_p": 0.95,
+    "top_k": 30,
 }

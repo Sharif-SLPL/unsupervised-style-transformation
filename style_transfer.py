@@ -7,7 +7,7 @@ from transformers import (
     # get_linear_schedule_with_warmup,
     AutoTokenizer
 )
-from transformers import pipeline#, GPT2LMHeadModel, AutoConfig, AutoModel, AutoModelForMaskedLM, AutoModelWithLMHead
+# from transformers import pipeline, GPT2LMHeadModel, AutoConfig, AutoModel, AutoModelForMaskedLM, AutoModelWithLMHead
 from sentence_transformers import SentenceTransformer, util
 from tqdm.auto import tqdm, trange
 from hazm import *
@@ -21,11 +21,6 @@ from style_classifier import *
 
 pd.options.display.max_colwidth = 200
 km = KMeansAlgorithm(2, iter=500, n_init=100)
-
-paraphraser_path = 'erfan226/persian-t5-paraphraser'
-para_model = T5ForConditionalGeneration.from_pretrained(paraphraser_path)
-para_tokenizer = AutoTokenizer.from_pretrained(paraphraser_path)
-para_pipe = pipeline(task='text2text-generation', model=para_model, tokenizer=para_tokenizer)
 
 class StyleTransfer:
     def __init__(self, num_outputs=1, conditional_generation=False, device="cuda"):
@@ -147,9 +142,6 @@ class StyleTransfer:
         self.tokenizer.save_pretrained(self.local_model_path)
 
     def formalize_text(self, text):
-        print(text)
-        text = para_pipe(text, encoder_no_repeat_ngram_size=5, do_sample=True, num_beams=5, max_length=128)[0]['generated_text']
-        print(text)
         self.model.eval()
         self.encode_text(text)
         self.decode_text(text)
@@ -169,7 +161,7 @@ class StyleTransfer:
         max_size = int(sent_len)
         #TODO: Add temperature=0.9, top_p=0.6, top_k=50 with default values
         # self.encoded_text = self.model.generate(**self.input_tokenized, encoder_no_repeat_ngram_size=4, no_repeat_ngram_size=4, min_length=sent_len, num_return_sequences=self.num_outputs, do_sample=GENERATION_CONFIG["do_sample"], num_beams=GENERATION_CONFIG["num_beams"], max_length=max_size)
-        self.encoded_text = self.model.generate(**self.input_tokenized, encoder_no_repeat_ngram_size=2, temperature=0.7, no_repeat_ngram_size=2, min_length=sent_len, early_stopping=True, num_return_sequences=self.num_outputs, do_sample=GENERATION_CONFIG["do_sample"], num_beams=GENERATION_CONFIG["num_beams"], max_length=max_size, top_k=50, top_p=0.9)
+        self.encoded_text = self.model.generate(**self.input_tokenized, encoder_no_repeat_ngram_size=2, temperature=GENERATION_CONFIG["temperature"], no_repeat_ngram_size=2, min_length=sent_len, early_stopping=True, num_return_sequences=self.num_outputs, do_sample=GENERATION_CONFIG["do_sample"], num_beams=GENERATION_CONFIG["num_beams"], max_length=max_size, top_k=GENERATION_CONFIG["top_k"], top_p=GENERATION_CONFIG["top_p"])
         # self.encoded_text = self.model.generate(**self.input_tokenized, min_length=sent_len, early_stopping=True, max_length=max_size)
 
     def decode_text(self, input_text):
