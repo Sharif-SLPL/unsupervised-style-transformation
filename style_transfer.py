@@ -7,18 +7,25 @@ from transformers import (
     # get_linear_schedule_with_warmup,
     AutoTokenizer
 )
-# from transformers import pipeline, GPT2LMHeadModel, AutoConfig, AutoModel, AutoModelForMaskedLM, AutoModelWithLMHead
+from transformers import pipeline#, GPT2LMHeadModel, AutoConfig, AutoModel, AutoModelForMaskedLM, AutoModelWithLMHead
 from sentence_transformers import SentenceTransformer, util
 from tqdm.auto import tqdm, trange
 from hazm import *
 import pandas as pd
-from utils import get_batch, cleanup, load_model
+from utils import get_batch, cleanup, load_model, draw_loss_plot
 from style_classifier import *
 import os
-from config import BASE_CONFIG, GENERATION_CONFIG
+from config import BASE_CONFIG, GENERATION_CONFIG, TRAIN_CONFIG
 from text_processor import read_txt
+from style_classifier import *
 
 pd.options.display.max_colwidth = 200
+km = KMeansAlgorithm(2, iter=500, n_init=100)
+
+paraphraser_path = 'erfan226/persian-t5-paraphraser'
+para_model = T5ForConditionalGeneration.from_pretrained(paraphraser_path)
+para_tokenizer = AutoTokenizer.from_pretrained(paraphraser_path)
+para_pipe = pipeline(task='text2text-generation', model=para_model, tokenizer=para_tokenizer)
 
 class StyleTransfer:
     def __init__(self, num_outputs=1, conditional_generation=False, device="cuda"):
@@ -34,6 +41,7 @@ class StyleTransfer:
         self.model.to(self.device)
         self.conditional_generation = conditional_generation
         self.num_outputs = num_outputs
+        self.loss_history = []
 
     def train(self, data):
         # TODO: Remove
@@ -44,14 +52,14 @@ class StyleTransfer:
         optimizer.param_groups[0]['lr'] = 1e-5
         # mult = 2 (batch size of 16) seems to be optimal for a model of this size on Colab. About 2% of batches are OOM, but we will tolerate this.
         self.model.train()
-        mult = 3
+        mult = 4
         batch_size = mult * 8
         max_len = 128  # if fact, the texts are almost never longer than roughly 360 tokens
         epochs = 500
         accumulation_steps = 32
-        save_steps = 4000
+        save_steps = 2000
 
-        window = 4000
+        window = 2000
         ewm = 0
         errors = 0
 
@@ -106,6 +114,10 @@ class StyleTransfer:
             ewm = ewm * (1-w) + loss.item() * w
             tq.set_description(f'loss: {ewm}')
 
+            # Save history when an epoch is completed
+            if i > 0 and i % (len(data)/mult) == 0:
+              self.loss_history.append((i/len(data), ewm))
+
             if i % accumulation_steps == 0:
                 optimizer.step()
                 optimizer.zero_grad()
@@ -117,17 +129,27 @@ class StyleTransfer:
                 cleanup()
                 # optimizer.param_groups[0]['lr'] *= 0.999
             if i % save_steps == 0 and i > 0:
-                save_model(self.model, self.tokenizer, self.model_path)
+                self.save_model()
                 print('saving...', i, optimizer.param_groups[0]['lr'])
+                self.loss_history.append((round(i/len(data)), ewm))
+                draw_loss_plot(self.loss_history)
             # Early stopping:
-            if ewm < 0.01:
+            if ewm < TRAIN_CONFIG["loss_threshold"]:
+                self.loss_history.append((round(i/len(data)), ewm))
+                draw_loss_plot(self.loss_history)
+                self.save_model()
+                print('saving...', i, optimizer.param_groups[0]['lr'])
+                print("Stopping Training...")
                 break  # early stop criterion is met, we can stop now
         
     def save_model(self):
-        self.model.save_pretrained(self.path)
-        self.tokenizer.save_pretrained(self.path)
+        self.model.save_pretrained(self.local_model_path)
+        self.tokenizer.save_pretrained(self.local_model_path)
 
     def formalize_text(self, text):
+        print(text)
+        text = para_pipe(text, encoder_no_repeat_ngram_size=5, do_sample=True, num_beams=5, max_length=128)[0]['generated_text']
+        print(text)
         self.model.eval()
         self.encode_text(text)
         self.decode_text(text)
@@ -146,7 +168,9 @@ class StyleTransfer:
         sent_len = self.input_tokenized.input_ids.shape[1]
         max_size = int(sent_len)
         #TODO: Add temperature=0.9, top_p=0.6, top_k=50 with default values
-        self.encoded_text = self.model.generate(**self.input_tokenized, encoder_no_repeat_ngram_size=4, no_repeat_ngram_size=4, min_length=sent_len, num_return_sequences=self.num_outputs, do_sample=GENERATION_CONFIG["do_sample"], num_beams=GENERATION_CONFIG["num_beams"], max_length=max_size)
+        # self.encoded_text = self.model.generate(**self.input_tokenized, encoder_no_repeat_ngram_size=4, no_repeat_ngram_size=4, min_length=sent_len, num_return_sequences=self.num_outputs, do_sample=GENERATION_CONFIG["do_sample"], num_beams=GENERATION_CONFIG["num_beams"], max_length=max_size)
+        self.encoded_text = self.model.generate(**self.input_tokenized, encoder_no_repeat_ngram_size=2, temperature=0.7, no_repeat_ngram_size=2, min_length=sent_len, early_stopping=True, num_return_sequences=self.num_outputs, do_sample=GENERATION_CONFIG["do_sample"], num_beams=GENERATION_CONFIG["num_beams"], max_length=max_size, top_k=50, top_p=0.9)
+        # self.encoded_text = self.model.generate(**self.input_tokenized, min_length=sent_len, early_stopping=True, max_length=max_size)
 
     def decode_text(self, input_text):
         if len(self.encoded_text) <= 1:
@@ -160,9 +184,10 @@ class StyleTransfer:
                     emb1 = Sbert.encode(input_text, convert_to_tensor=True)
                     emb2 = Sbert.encode(generated_output, convert_to_tensor=True)
                     cosine_scores = util.cos_sim(emb1, emb2)
-                    if cosine_scores > GENERATION_CONFIG["text_similarity"]:
+                    is_formal = km.predict_instance([generated_output])
+                    if cosine_scores > GENERATION_CONFIG["text_similarity"]:# and is_formal:
                         # print(generated_output)
-                        temp.append(generated_output)
+                        temp.append((generated_output, is_formal))
                 self.decoded_text = temp
                 if len(self.decoded_text) < 1:
                     self.decoded_text = "No output for this sentence! Changing the condition might help..."
