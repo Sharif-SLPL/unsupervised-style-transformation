@@ -1,6 +1,7 @@
 import gc
 import torch
 import pickle
+import matplotlib.pyplot as plt
 
 def save_model(model, path):
   with open("models/"+path, 'wb') as f:
@@ -25,3 +26,12 @@ def get_batch(input, mult=1):
 def cleanup():
     gc.collect()
     torch.cuda.empty_cache()
+
+def draw_loss_plot(i_history):
+    i_iter, i_loss = zip(*i_history)
+    plt.plot(i_iter, i_loss, label='loss')
+    plt.xlabel("Epoch")
+    plt.legend(loc='upper left')
+    title = "Training Loss Plot"
+    plt.title(title)
+    plt.savefig(title+".png")
