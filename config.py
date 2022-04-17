@@ -1,6 +1,5 @@
 BASE_CONFIG = {
-    # "model_path": "erfan226/persian-t5-paraphraser",
-    "model_path": "Ahmad/parsT5-base",
+    "model_path": "erfan226/persian-t5-paraphraser",
     "local_model_path": "/gd2/MyDrive/models/persian-t5-style-paraphraser" # You must change this to your own directory
 }
 TRAIN_CONFIG = {
