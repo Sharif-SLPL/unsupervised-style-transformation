@@ -3,7 +3,8 @@ import torch
 from transformers import (
     Adafactor,
     T5ForConditionalGeneration,
-    AutoTokenizer
+    AutoTokenizer,
+    set_seed
 )
 from sentence_transformers import SentenceTransformer, util
 from tqdm.auto import tqdm, trange
@@ -21,6 +22,7 @@ km = KMeansAlgorithm(2, iter=500, n_init=100)
 
 class StyleTransfer:
     def __init__(self, num_outputs=1, conditional_generation=False, device="cuda"):
+        set_seed(BASE_CONFIG["st_seed"])
         self.device = torch.device(device)
         self.st_model_path = BASE_CONFIG["st_model_path"]
         # Model's path if exist to be used for inference. Save the trained model in this path
