@@ -1,5 +1,11 @@
 # Persian Formality Style Transfer
 This project aims to do formality style transfer on Persian language using the T5 transformer architecture.  
+You can see a demo of the Formality Style Transfer on [HuggingFace Spaces](https://huggingface.co/spaces/erfan226/Persian_FST). Demo for the other models will be available soon.
+
+### Available Models on HuggingFace
+* [Formality Style Transfer](https://huggingface.co/erfan226/persian-t5-formality-transfer)
+* [Paraphraser](https://huggingface.co/erfan226/persian-t5-paraphraser)
+
 
 ### Available Tasks
 | Tasks | Description |
