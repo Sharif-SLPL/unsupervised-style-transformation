@@ -1,13 +1,10 @@
 from __future__ import unicode_literals
 import torch
 from transformers import (
-    # AdamW,
+    Adafactor,
     T5ForConditionalGeneration,
-    # T5Tokenizer,
-    # get_linear_schedule_with_warmup,
     AutoTokenizer
 )
-# from transformers import pipeline, GPT2LMHeadModel, AutoConfig, AutoModel, AutoModelForMaskedLM, AutoModelWithLMHead
 from sentence_transformers import SentenceTransformer, util
 from tqdm.auto import tqdm, trange
 from hazm import *
@@ -25,14 +22,14 @@ km = KMeansAlgorithm(2, iter=500, n_init=100)
 class StyleTransfer:
     def __init__(self, num_outputs=1, conditional_generation=False, device="cuda"):
         self.device = torch.device(device)
-        self.model_path = BASE_CONFIG["model_path"]
+        self.st_model_path = BASE_CONFIG["st_model_path"]
         # Model's path if exist to be used for inference. Save the trained model in this path
-        self.local_model_path = BASE_CONFIG["local_model_path"]
-        if os.path.exists(self.local_model_path):
+        self.local_st_model_path = BASE_CONFIG["local_st_model_path"]
+        if os.path.exists(self.local_st_model_path):
             print('Loading model from local checkpoint')
-            self.model_path = self.local_model_path
-        self.model = T5ForConditionalGeneration.from_pretrained(self.model_path)
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
+            self.st_model_path = self.local_st_model_path
+        self.model = T5ForConditionalGeneration.from_pretrained(self.st_model_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.st_model_path)
         self.model.to(self.device)
         self.conditional_generation = conditional_generation
         self.num_outputs = num_outputs
@@ -43,13 +40,24 @@ class StyleTransfer:
         # qq = [0.5, 0.75, 0.9, 0.99, 1]
         # print(pd.Series(len(self.tokenizer(get_batch(data, mult=3)[0], padding=True)['input_ids'][0]) for _ in range(1000)).quantile(qq))
         # print(pd.Series(len(self.tokenizer(get_batch(data, mult=3)[1], padding=True)['input_ids'][0]) for _ in range(1000)).quantile(qq))
-        optimizer = torch.optim.Adam(params = [p for p in self.model.parameters() if p.requires_grad], lr=1e-5)
-        optimizer.param_groups[0]['lr'] = 1e-5
-        # mult = 2 (batch size of 16) seems to be optimal for a model of this size on Colab. About 2% of batches are OOM, but we will tolerate this.
+        # optimizer = torch.optim.Adam(params = [p for p in self.model.parameters() if p.requires_grad], lr=1e-5)
+        # optimizer.param_groups[0]['lr'] = 1e-5
+        optimizer = Adafactor(
+            self.model.parameters(),
+            lr=TRAIN_CONFIG["learning_rate"], #1e-3,
+            eps=(1e-30, 1e-3),
+            clip_threshold=1.0,
+            decay_rate=-0.8,
+            beta1=None,
+            weight_decay=0.0,
+            relative_step=True,
+            # scale_parameter=False,
+            warmup_init=TRAIN_CONFIG["warmup_init"],
+        )
         self.model.train()
         mult = 4
         batch_size = mult * 8
-        max_len = 128  # if fact, the texts are almost never longer than roughly 360 tokens
+        max_len = 128 
         epochs = 500
         accumulation_steps = 32
         save_steps = 2000
@@ -58,7 +66,8 @@ class StyleTransfer:
         ewm = 0
         errors = 0
 
-        tq = trange(int(1000 * epochs / mult)) #1_000_000
+        # tq = trange(int(1000 * epochs / mult)) #1_000_000
+        tq = trange(int(len(data)/2 * epochs)) #1_000_000
         cleanup()
 
         # TODO: Freeze layers during training if needed
@@ -85,10 +94,7 @@ class StyleTransfer:
                 y = self.tokenizer(xx, return_tensors='pt', padding=True, truncation=True, max_length=max_len).to(self.device)
                 x = self.tokenizer(yy, return_tensors='pt', padding=True, truncation=True, max_length=max_len).to(self.device)
 
-                # Whole text will be reconstructed so no need to mask tokens
-                # TODO: Tips on T5 -> end token or some tokes are very imp! check them out
-                # do not force the model to predict pad tokens
-                y.input_ids[y.input_ids==0] = -100
+                y.input_ids[y.input_ids==0] = -100  #to make sure we have correct labels for T5 text generation
                 loss = self.model(
                     input_ids=x.input_ids,
                     attention_mask=x.attention_mask,
@@ -112,6 +118,8 @@ class StyleTransfer:
             # Save history when an epoch is completed
             if i > 0 and i % (len(data)/mult) == 0:
               self.loss_history.append((i/len(data), ewm))
+            if i%10 ==0:# redundant maybe but save loss every 10 steps TODO: revise loss_history
+                self.loss_history.append(loss.item())
 
             if i % accumulation_steps == 0:
                 optimizer.step()
@@ -126,11 +134,11 @@ class StyleTransfer:
             if i % save_steps == 0 and i > 0:
                 self.save_model()
                 print('saving...', i, optimizer.param_groups[0]['lr'])
-                self.loss_history.append((round(i/len(data)), ewm))
+                # self.loss_history.append((round(i/len(data)), ewm))
                 draw_loss_plot(self.loss_history)
             # Early stopping:
             if ewm < TRAIN_CONFIG["loss_threshold"]:
-                self.loss_history.append((round(i/len(data)), ewm))
+                # self.loss_history.append((round(i/len(data)), ewm))
                 draw_loss_plot(self.loss_history)
                 self.save_model()
                 print('saving...', i, optimizer.param_groups[0]['lr'])
@@ -138,8 +146,8 @@ class StyleTransfer:
                 break  # early stop criterion is met, we can stop now
         
     def save_model(self):
-        self.model.save_pretrained(self.local_model_path)
-        self.tokenizer.save_pretrained(self.local_model_path)
+        self.model.save_pretrained(self.local_st_model_path)
+        self.tokenizer.save_pretrained(self.local_st_model_path)
 
     def formalize_text(self, text):
         self.model.eval()
