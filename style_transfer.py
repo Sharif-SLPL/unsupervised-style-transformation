@@ -171,7 +171,7 @@ class StyleTransfer:
         max_size = int(sent_len)
         #TODO: Add temperature=0.9, top_p=0.6, top_k=50 with default values
         # self.encoded_text = self.model.generate(**self.input_tokenized, encoder_no_repeat_ngram_size=4, no_repeat_ngram_size=4, min_length=sent_len, num_return_sequences=self.num_outputs, do_sample=GENERATION_CONFIG["do_sample"], num_beams=GENERATION_CONFIG["num_beams"], max_length=max_size)
-        self.encoded_text = self.model.generate(**self.input_tokenized, encoder_no_repeat_ngram_size=2, temperature=GENERATION_CONFIG["temperature"], no_repeat_ngram_size=2, min_length=sent_len, early_stopping=True, num_return_sequences=self.num_outputs, do_sample=GENERATION_CONFIG["do_sample"], num_beams=GENERATION_CONFIG["num_beams"], max_length=max_size, top_k=GENERATION_CONFIG["top_k"], top_p=GENERATION_CONFIG["top_p"])
+        self.encoded_text = self.model.generate(**self.input_tokenized, temperature=GENERATION_CONFIG["temperature"], no_repeat_ngram_size=2, min_length=sent_len, early_stopping=True, num_return_sequences=self.num_outputs, do_sample=GENERATION_CONFIG["do_sample"], num_beams=GENERATION_CONFIG["num_beams"], max_length=max_size, top_k=GENERATION_CONFIG["top_k"], top_p=GENERATION_CONFIG["top_p"])
         # self.encoded_text = self.model.generate(**self.input_tokenized, min_length=sent_len, early_stopping=True, max_length=max_size)
 
     def decode_text(self, input_text):
