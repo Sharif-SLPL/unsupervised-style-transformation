@@ -29,9 +29,9 @@ def cleanup():
 
 def draw_loss_plot(i_history):
     i_iter, i_loss = zip(*i_history)
-    plt.plot(i_iter, i_loss, label='loss')
+    plt.plot(i_iter, i_loss)
     plt.xlabel("Epoch")
-    plt.legend(loc='upper left')
-    title = "Training Loss Plot"
+    # plt.legend(loc='upper left')
+    title = "training_loss"
     plt.title(title)
     plt.savefig(title+".png")

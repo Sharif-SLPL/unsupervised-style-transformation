@@ -1,5 +1,6 @@
 # Paraphrase & Style Transfer model path
 BASE_CONFIG = {
+    "st_seed": 1,
     "para_model_path": "erfan226/persian-t5-paraphraser", # load the base model if you want to fine-tune the model with your own data -> Ahmad/parsT5-base
     "local_para_model_path": "/gd/MyDrive/models/persian-t5-paraphraser", # Direcotry to save the trained/downloaded (outside of HuggingFace) model. You must change this to your own directory.
     "st_model_path": "erfan226/persian-t5-paraphraser",
