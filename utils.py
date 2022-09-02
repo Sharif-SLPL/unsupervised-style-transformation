@@ -27,11 +27,11 @@ def cleanup():
     gc.collect()
     torch.cuda.empty_cache()
 
-def draw_loss_plot(i_history):
-    i_iter, i_loss = zip(*i_history)
-    plt.plot(i_iter, i_loss)
-    plt.xlabel("Epoch")
-    # plt.legend(loc='upper left')
-    title = "training_loss"
+def draw_loss_plot(history):
+    batches = list(range(0, len(history)))
+    plt.plot(batches, history, label='loss')
+    plt.xlabel("Batch")
+    plt.legend(loc='upper left')
+    title = "Training Loss Plot"
     plt.title(title)
     plt.savefig(title+".png")
