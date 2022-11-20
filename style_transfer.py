@@ -204,7 +204,7 @@ class StyleTransfer:
         test_dataloader = DataLoader(
             tokenized_datasets, shuffle=True, batch_size=8, collate_fn=data_collator
         )
-        with open("diversified.txt", "w") as f:
+        with open("output.txt", "w") as f:
           for i, batch in tqdm(enumerate(tokenized_datasets)):
             original_text = dataset[i]["sentence"]
             original_text = original_text.replace("1 paraphrase: ", "")
