@@ -25,7 +25,7 @@ pd.options.display.max_colwidth = 200
 class StyleTransfer:
     def __init__(self, num_outputs=1, conditional_generation=False, device="cuda"):
         self.device = torch.device(device)
-        self.st_model_path = BASE_CONFIG["base_model_path"]
+        self.st_model_path = BASE_CONFIG["base_model_path"] # Or use base model
         # Model's path if exist to be used for inference. Save the trained model in this path
         self.local_st_model_path = BASE_CONFIG["trained_model_path"]
         if os.path.exists(self.local_st_model_path):
@@ -204,11 +204,12 @@ class StyleTransfer:
         test_dataloader = DataLoader(
             tokenized_datasets, shuffle=True, batch_size=8, collate_fn=data_collator
         )
-        with open("output.txt", "w") as f:
+        with open("output.csv", "w") as f:
+          f.write("text,text2\n")
           for i, batch in tqdm(enumerate(tokenized_datasets)):
             original_text = dataset[i]["sentence"]
             original_text = original_text.replace("1 paraphrase: ", "")
-            original_text = original_text.replace("1 transfer: ", "")
+            original_text = original_text.replace("{transfer:} 1 ", "")
             original_text = original_text.replace(" </s>", "")
             original_text_size = len(original_text.split())
             batch = {k: torch.unsqueeze(v.to(self.model.device), 0) for k, v in batch.items()}
